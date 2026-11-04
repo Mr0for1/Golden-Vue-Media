@@ -1113,6 +1113,359 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .gvm-ripple { animation-duration: 0.01s; }
 }
+/* ═══════════════════════════════════════════════════════════
+   TESTIMONIALS — Golden Vue Media
+   Every selector is scoped to #testimonials (classes use .tm-)
+   so nothing here can leak into the rest of the site.
+   Palette + type reuse the site variables:
+   --black / --white / --gold-solid / --gold-gradient
+   Montserrat (body) · Raleway (headings)
+   ═══════════════════════════════════════════════════════════ */
+#testimonials {
+  --tm-ease: cubic-bezier(0.22, 1, 0.36, 1);        /* card travel + reveal */
+  --tm-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --tm-dur: 0.8s;
+  --tm-interval: 7s;                                 /* overwritten by JS (AUTOPLAY_MS) */
+  --tm-card-w: 64%;                                  /* of the 1150px max carousel container */
+  --tm-angle: 25deg;                                 /* side-card Y rotation */
+  --tm-side-scale: 0.88;
+  --tm-side-x: 31%;                                  /* side-card offset, % of its own width */
+  --tm-clip-on:  polygon(0 0, 92% 0, 96% 15%, 99% 35%, 100% 50%, 99% 66%, 96% 84%, 90% 100%, 0 100%);
+  --tm-clip-off: polygon(0 0, 0 0, 0 15%, 0 35%, 0 50%, 0 66%, 0 84%, 0 100%, 0 100%);
+  position: relative; overflow: hidden; isolation: isolate;
+  background: var(--white); color: var(--black);
+  padding: 6rem 0 5rem;
+}
+#testimonials [hidden] { display: none !important; }
+
+/* ── decorative background (soft gold glow + fine gold curves) ── */
+#testimonials .tm-bg {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(60% 50% at 50% 60%, rgba(232,168,32,0.08) 0%, transparent 70%);
+}
+#testimonials .tm-bg svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#testimonials .tm-bg path {
+  fill: none; stroke: var(--gold-solid); stroke-width: 1; opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ── header ── */
+#testimonials .tm-header { text-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 5%; }
+#testimonials .tm-label {
+  display: flex; align-items: center; justify-content: center; gap: 1.2rem;
+  font-size: clamp(0.8rem, 3.2vw, 1.25rem); letter-spacing: 0.2em;
+}
+#testimonials .tm-rule { width: clamp(24px, 8vw, 110px); height: 1px; background: var(--gold-gradient); flex: none; }
+#testimonials .tm-title { margin-bottom: 1.2rem; color: var(--black); }
+#testimonials .tm-gold {
+  background: var(--gold-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+#testimonials .tm-sub { margin: 0 auto; text-align: center; max-width: 560px; color: rgba(0,0,0,0.55); }
+
+/* ── carousel shell ── */
+#testimonials .tm-wrap { position: relative; width: 90%; max-width: 1150px; margin: 2.5rem auto 0; }
+#testimonials .tm-carousel { position: relative; outline: none; border-radius: 24px; }
+#testimonials .tm-carousel:focus-visible { outline: 2px solid var(--gold-solid); outline-offset: 6px; }
+
+#testimonials .tm-stage {
+  display: grid; justify-items: center; align-items: stretch;
+  padding: 2.5rem 0;
+  perspective: 1000px; perspective-origin: 50% 50%;
+  touch-action: pan-y;                 /* vertical scroll stays native, horizontal = swipe */
+}
+
+/* ── card ── */
+#testimonials .tm-card {
+  --tx: 0%; --tz: 0px; --ry: 0deg; --s: 1; --o: 1; --z: 1; --dim: 0;
+  grid-area: 1 / 1;
+  position: relative;
+  width: var(--tm-card-w);
+  min-height: 440px;
+  display: grid; grid-template-columns: 40% 1fr;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(232,168,32,0.08) 0%, transparent 60%),
+    linear-gradient(145deg, #151515 0%, #0b0b0b 100%);
+  border: 1px solid rgba(232,168,32,0.28);
+  border-radius: 24px;
+  overflow: hidden;
+  transform: translateX(var(--tx)) rotateY(var(--ry)) scale(var(--s));
+  opacity: var(--o);
+  z-index: var(--z);
+  will-change: transform, opacity;
+  transition:
+    transform var(--tm-dur) var(--tm-ease),
+    opacity 0.8s ease,
+    box-shadow var(--tm-dur) ease,
+    border-color var(--tm-dur) ease,
+    visibility var(--tm-dur) linear,
+    z-index 0.01s linear 0.22s;        /* the swap of who is in front happens as the cards cross */
+}
+/* dimming veil on the side cards */
+#testimonials .tm-card::after {
+  content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background: #000; opacity: var(--dim);
+  transition: opacity var(--tm-dur) ease;
+}
+
+/* positions: centre stage · left / right previews (25° Y-rotation, 0.88 scale) · parked off-stage */
+#testimonials .tm-card[data-pos="center"] {
+  --z: 3;
+  border-color: rgba(232,168,32,0.5);
+  box-shadow: 0 34px 70px rgba(0,0,0,0.30), 0 0 0 1px rgba(232,168,32,0.14);
+}
+#testimonials .tm-card[data-pos="left"]  { --tx: calc(var(--tm-side-x) * -1); --ry:  var(--tm-angle); --s: var(--tm-side-scale); --z: 2; --dim: 0.22; box-shadow: 0 20px 44px rgba(0,0,0,0.22); }
+#testimonials .tm-card[data-pos="right"] { --tx: var(--tm-side-x);            --ry: calc(var(--tm-angle) * -1); --s: var(--tm-side-scale); --z: 2; --dim: 0.22; box-shadow: 0 20px 44px rgba(0,0,0,0.22); }
+#testimonials .tm-card[data-pos="far-left"]  { --tx: -14%; --ry:  32deg; --s: 0.7; --o: 0; --z: 1; --dim: 0.4; visibility: hidden; }
+#testimonials .tm-card[data-pos="far-right"] { --tx:  14%; --ry: -32deg; --s: 0.7; --o: 0; --z: 1; --dim: 0.4; visibility: hidden; }
+#testimonials .tm-card[data-pos="left"]:hover  { --dim: 0.08; }
+#testimonials .tm-card[data-pos="right"]:hover { --dim: 0.08; }
+
+/* a card travelling behind the others (e.g. left → right) stays underneath */
+#testimonials .tm-card.tm-pass { z-index: 1; transition-delay: 0s; }
+/* wrap-around teleport (only when 4+ testimonials): no visible flight */
+#testimonials .tm-card.tm-jump,
+#testimonials .tm-card.tm-jump * { transition: none !important; }
+
+/* ── portrait ── */
+#testimonials .tm-portrait { position: relative; }
+#testimonials .tm-photo,
+#testimonials .tm-edge { position: absolute; top: 0; bottom: 0; left: 0; clip-path: var(--tm-clip-off); }
+#testimonials .tm-photo { right: 0; overflow: hidden; background: #111; transition: clip-path 0.35s ease 0s; }
+#testimonials .tm-edge  { right: -4px; background: var(--gold-gradient); transition: clip-path 0.35s ease 0s; }
+#testimonials .tm-card[data-pos="center"] .tm-photo,
+#testimonials .tm-card[data-pos="center"] .tm-edge { clip-path: var(--tm-clip-on); }
+#testimonials .tm-card[data-pos="center"] .tm-photo { transition: clip-path 0.8s var(--tm-ease-out) 0.1s; }
+#testimonials .tm-card[data-pos="center"] .tm-edge  { transition: clip-path 0.8s var(--tm-ease-out) 0.2s; }
+
+#testimonials .tm-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transform: scale(1.16);
+  transition: transform 1.2s var(--tm-ease-out) 0.05s;
+  -webkit-user-drag: none; user-select: none;
+}
+#testimonials .tm-card[data-pos="center"] .tm-img { transform: scale(1); }
+
+/* sample / placeholder portrait */
+#testimonials .tm-photo.is-placeholder {
+  display: flex; align-items: flex-end; justify-content: center;
+  background:
+    radial-gradient(70% 55% at 35% 28%, rgba(232,168,32,0.28) 0%, transparent 70%),
+    linear-gradient(165deg, #1d1d1d 0%, #090909 100%);
+}
+#testimonials .tm-photo.is-placeholder svg {
+  width: 74%; height: auto; fill: var(--gold-solid); opacity: 0.22;
+  transform: translateY(6%) scale(1.1);
+  transition: transform 1.2s var(--tm-ease-out) 0.05s;
+}
+#testimonials .tm-card[data-pos="center"] .tm-photo.is-placeholder svg { transform: translateY(6%) scale(1); }
+#testimonials .tm-photo.is-placeholder::after {
+  content: 'Portrait placeholder';
+  position: absolute; left: 1.4rem; top: 1.3rem;
+  font-size: 0.55rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(232,168,32,0.85);
+}
+
+/* ── right-hand content ── */
+#testimonials .tm-body {
+  position: relative;
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+  padding: 2.6rem 2.4rem 2.3rem 2.1rem;
+}
+#testimonials .tm-badge {
+  position: absolute; top: 1.3rem; right: 1.4rem;
+  font-size: 0.55rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--gold-solid);
+  border: 1px solid rgba(232,168,32,0.5); background: rgba(232,168,32,0.08);
+  padding: 0.35rem 0.7rem;
+}
+#testimonials .tm-qmark {
+  display: block; height: 2.2rem; margin-bottom: 0.3rem;
+  font-family: 'Raleway', sans-serif; font-weight: 900; font-size: 5rem; line-height: 0.85;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+#testimonials .tm-quote {
+  margin: 0.8rem 0 1.3rem;
+  font-family: 'Montserrat', sans-serif; font-weight: 400;
+  font-size: clamp(1rem, 1.3vw, 1.2rem); line-height: 1.6; letter-spacing: 0.005em;
+  color: var(--white);
+}
+#testimonials .tm-stars { display: flex; gap: 4px; }
+#testimonials .tm-stars svg { width: 19px; height: 19px; fill: var(--gold-solid); }
+#testimonials .tm-stars svg.is-off { fill: rgba(255,255,255,0.16); }
+#testimonials .tm-cite { margin-top: 1.2rem; }
+#testimonials .tm-name {
+  font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 0.95rem;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--white);
+}
+#testimonials .tm-role { margin-top: 0.3rem; font-size: 0.75rem; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); }
+#testimonials .tm-foot {
+  width: 100%; margin-top: 1.4rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+#testimonials .tm-line { width: 46px; height: 2px; background: var(--gold-gradient); }
+#testimonials .tm-brand { height: 15px; width: auto; opacity: 0.7; display: block; }
+
+/* staggered content reveal — centre card only */
+#testimonials .tm-r {
+  opacity: 0; transform: translateY(22px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#testimonials .tm-card[data-pos="center"] .tm-r {
+  opacity: 1; transform: none;
+  transition: opacity 0.7s var(--tm-ease-out), transform 0.8s var(--tm-ease-out);
+  transition-delay: calc(0.22s + var(--i, 0) * 0.07s);
+}
+/* the badge is positioned absolutely, so keep its reveal horizontal-safe */
+#testimonials .tm-badge.tm-r { transform: translateY(-10px); }
+#testimonials .tm-card[data-pos="center"] .tm-badge.tm-r { transform: none; }
+
+/* ── condensed preview shown on the side cards ── */
+#testimonials .tm-mini {
+  position: absolute; top: 0; bottom: 0; width: 33%;
+  display: flex; flex-direction: column; justify-content: center; gap: 0.75rem;
+  padding: 1.4rem 1.3rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+#testimonials .tm-mini.is-left  { left: 0;  align-items: flex-start; text-align: left; }
+#testimonials .tm-mini.is-right { right: 0; align-items: flex-end; text-align: right; }
+#testimonials .tm-card[data-pos="left"]  .tm-mini.is-left,
+#testimonials .tm-card[data-pos="right"] .tm-mini.is-right {
+  opacity: 1; transition: opacity 0.5s ease 0.3s;
+}
+#testimonials .tm-avatar {
+  width: 58px; height: 58px; border-radius: 50%; overflow: hidden; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid rgba(232,168,32,0.6);
+  background: radial-gradient(circle at 30% 25%, rgba(232,168,32,0.32), #111 72%);
+  font-family: 'Raleway', sans-serif; font-weight: 800; font-size: 1.15rem; color: var(--gold-solid);
+}
+#testimonials .tm-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#testimonials .tm-mini .tm-name { font-size: 0.78rem; }
+#testimonials .tm-mini .tm-stars svg { width: 13px; height: 13px; }
+#testimonials .tm-mini-quote {
+  font-size: 0.82rem; font-weight: 300; line-height: 1.65; color: rgba(255,255,255,0.62);
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* click target covering a side card (a real button → keyboard + screen-reader friendly) */
+#testimonials .tm-hit {
+  position: absolute; inset: 0; z-index: 6;
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+}
+#testimonials .tm-hit:focus-visible { outline: 2px solid var(--gold-solid); outline-offset: -8px; }
+
+/* ── arrows ── */
+#testimonials .tm-arrow {
+  position: absolute; top: calc(50% - 0px); z-index: 10;
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center; padding: 0;
+  background: var(--black); color: var(--white); border: 0; cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+  transform: translateY(-50%);
+  transition: transform 0.35s var(--tm-ease-out), background 0.3s ease, box-shadow 0.3s ease;
+}
+#testimonials .tm-arrow svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+#testimonials .tm-arrow:hover { background: var(--gold-gradient); color: var(--black); transform: translateY(-50%) scale(1.08); box-shadow: 0 12px 32px rgba(232,168,32,0.4); }
+#testimonials .tm-arrow:active { transform: translateY(-50%) scale(0.96); }
+/* arrows sit in the margin beside the container so they never cover the side previews */
+#testimonials .tm-prev { left: -4.5vw; }
+#testimonials .tm-next { right: -4.5vw; }
+#testimonials .tm-arrow:focus-visible,
+#testimonials .tm-dot:focus-visible { outline: 2px solid var(--gold-solid); outline-offset: 3px; }
+
+/* ── dots + pause ── */
+#testimonials .tm-controls { display: flex; align-items: center; justify-content: center; gap: 1.6rem; margin-top: 0.4rem; }
+#testimonials .tm-dots { display: flex; align-items: center; gap: 0.7rem; }
+#testimonials .tm-dot {
+  position: relative; width: 7px; height: 7px; padding: 0; border: 0; border-radius: 7px;
+  background: rgba(0,0,0,0.18); cursor: pointer;
+  transition: width 0.55s var(--tm-ease-out), background 0.3s ease;
+}
+#testimonials .tm-dot::before { content: ''; position: absolute; inset: -12px -6px; }      /* larger tap area */
+#testimonials .tm-dot::after  {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--gold-gradient); transform: scaleX(0); transform-origin: left center;
+}
+#testimonials .tm-dot:hover { background: rgba(0,0,0,0.35); }
+#testimonials .tm-dot.is-active { width: 26px; background: rgba(232,168,32,0.25); }
+#testimonials .tm-dot.is-active::after { transform: scaleX(1); }
+/* autoplay progress lives in the active dot — the animation end advances the slide */
+#testimonials.tm-autoplay .tm-dot.is-active::after { animation: tmProgress var(--tm-interval) linear forwards; }
+#testimonials.is-paused .tm-dot.is-active::after { animation-play-state: paused; }
+@keyframes tmProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+#testimonials .tm-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── tablet (≤1100px) ── */
+@media (max-width: 1100px) {
+  #testimonials { --tm-card-w: 66%; --tm-side-x: 30%; }
+  #testimonials .tm-body { padding: 2.2rem 1.8rem 2rem 1.6rem; }
+  #testimonials .tm-qmark { font-size: 4.4rem; height: 1.9rem; }
+  #testimonials .tm-mini { width: 36%; padding: 1rem 0.9rem; gap: 0.55rem; }
+  #testimonials .tm-mini-quote { display: none; }
+  #testimonials .tm-avatar { width: 48px; height: 48px; font-size: 1rem; }
+  #testimonials .tm-arrow { width: 46px; height: 46px; }
+}
+
+/* nav room for the extra "Testimonials" link between 769px and 1100px */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .nav-links { gap: 0.95rem; font-size: 0.62rem; letter-spacing: 0.06em; }
+  .nav-logo-wrap { width: 180px; }
+  .nav-logo-wrap img { height: 23px; }
+  .nav-cta { white-space: nowrap; padding: 0.5rem 0.8rem; font-size: 0.6rem; letter-spacing: 0.1em; }
+}
+
+/* ── mobile (≤768px): stacked card; neighbours tucked in so nothing leaves the screen ── */
+@media (max-width: 768px) {
+  #testimonials {
+    --tm-card-w: 76%; --tm-side-x: 20%;
+    --tm-clip-on:  polygon(0 0, 100% 0, 100% 90%, 0 100%);
+    --tm-clip-off: polygon(0 0, 100% 0, 100% 0, 0 0);
+    padding: 4.5rem 0 3.5rem;
+  }
+  #testimonials .tm-wrap { width: 100%; margin-top: 1.5rem; }
+  #testimonials .tm-stage { padding: 1.5rem 0; }
+  #testimonials .tm-card { grid-template-columns: 1fr; grid-template-rows: 210px auto; min-height: 0; border-radius: 20px; }
+  #testimonials .tm-card[data-pos="left"]:hover,
+  #testimonials .tm-card[data-pos="right"]:hover { --dim: 0.22; }
+  #testimonials .tm-edge  { right: 0; bottom: -4px; }
+  #testimonials .tm-mini { display: none; }
+  #testimonials .tm-body { padding: 1.4rem 1.3rem 1.5rem; justify-content: flex-start; }
+  #testimonials .tm-badge { position: relative; top: auto; right: auto; margin-bottom: 0.9rem; align-self: flex-start; }
+  #testimonials .tm-qmark { font-size: 3.8rem; height: 1.7rem; }
+  #testimonials .tm-quote { font-size: 1rem; margin: 0.5rem 0 1rem; }
+  #testimonials .tm-cite { margin-top: 1rem; }
+  #testimonials .tm-foot { margin-top: 1.1rem; }
+  #testimonials .tm-arrow { width: 40px; height: 40px; top: calc(1.5rem + 105px); }
+  #testimonials .tm-arrow { background: var(--white); color: var(--black); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+  #testimonials .tm-arrow svg { width: 17px; height: 17px; }
+  #testimonials .tm-prev { left: 1.5%; }
+  #testimonials .tm-next { right: 1.5%; }
+  #testimonials .tm-photo.is-placeholder svg { width: 50%; }
+}
+
+/* ── reduced motion: no travel, no parallax, gentle fades only ── */
+@media (prefers-reduced-motion: reduce) {
+  #testimonials .tm-card { transition: opacity 0.35s ease, visibility 0.35s linear; }
+  #testimonials .tm-card::after { transition: none; }
+  #testimonials .tm-photo, #testimonials .tm-edge { transition: none; }
+  #testimonials .tm-img,
+  #testimonials .tm-photo.is-placeholder svg { transform: none !important; transition: none; }
+  #testimonials .tm-r,
+  #testimonials .tm-card[data-pos="center"] .tm-r { transform: none; transition: opacity 0.35s ease; transition-delay: 0s; }
+  #testimonials .tm-mini,
+  #testimonials .tm-card[data-pos="left"]  .tm-mini.is-left,
+  #testimonials .tm-card[data-pos="right"] .tm-mini.is-right { transition: opacity 0.35s ease; }
+  #testimonials .tm-arrow, #testimonials .tm-dot { transition: none; }
+  #testimonials .tm-arrow:hover { transform: translateY(-50%); }
+  #testimonials .tm-card { transition: opacity 0.35s ease, visibility 0.35s linear; }
+}
 </style>
 </head>
 <body>
@@ -1127,6 +1480,7 @@ html, body {
     </a>
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
+    <li><a href="#testimonials">Testimonials</a></li>
     <li><a href="#services">Services</a></li>
     <li><a href="#work">Work</a></li>
     <li><a href="#tone">Studio</a></li>
@@ -1141,6 +1495,7 @@ html, body {
 <!-- MOBILE DRAWER -->
 <div class="mobile-menu" id="mobileMenu">
   <a href="#about"    onclick="closeMob()">About</a>
+  <a href="#testimonials" onclick="closeMob()">Testimonials</a>
   <a href="#services" onclick="closeMob()">Services</a>
   <a href="#work"     onclick="closeMob()">Work</a>
   <a href="#tone"     onclick="closeMob()">Studio</a>
@@ -1234,7 +1589,44 @@ html, body {
   </div>
 </section>
 
-<!-- PERSONALITY -->
+<!-- TESTIMONIALS -->
+<section id="testimonials" aria-labelledby="tmTitle">
+  <div class="tm-bg" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <path d="M0 190 C 180 170, 330 90, 420 0"/>
+      <path d="M1260 0 C 1230 120, 1340 200, 1440 190"/>
+      <path d="M0 790 C 300 800, 520 840, 640 900"/>
+      <path d="M1440 760 C 1250 790, 1130 840, 1080 900"/>
+    </svg>
+  </div>
+
+  <header class="tm-header fade-up">
+    <div class="section-label tm-label"><span class="tm-rule"></span>Client Testimonials<span class="tm-rule"></span></div>
+    <h2 class="section-title tm-title" id="tmTitle">What Our Clients <span class="tm-gold">Say</span></h2>
+    <p class="section-body tm-sub">Real stories. Real results. From clients who trust Golden Vue Media.</p>
+  </header>
+
+  <div class="tm-wrap">
+    <div class="tm-carousel" id="tmCarousel" role="region" aria-roledescription="carousel"
+         aria-label="Client testimonials. Use the left and right arrow keys to browse." tabindex="0">
+      <div class="tm-stage" id="tmStage"></div>
+      <button class="tm-arrow tm-prev" id="tmPrev" type="button" aria-label="Previous testimonial">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg>
+      </button>
+      <button class="tm-arrow tm-next" id="tmNext" type="button" aria-label="Next testimonial">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 4 8 8-8 8"/></svg>
+      </button>
+    </div>
+
+    <div class="tm-controls">
+      <div class="tm-dots" id="tmDots" role="group" aria-label="Choose a testimonial"></div>
+    </div>
+    <p class="tm-sr" id="tmStatus" aria-live="off" aria-atomic="true"></p>
+  </div>
+
+  <noscript><p class="section-body" style="text-align:center;margin:2rem auto 0;">Client testimonials need JavaScript to display.</p></noscript>
+</section>
+  <!-- PERSONALITY -->
 <div id="personality">
   <div class="personality-left fade-up">
     <div class="section-label">Our Identity</div>
@@ -1888,5 +2280,394 @@ html, body {
 })();
 </script>
 
+<!-- ═══════════════ TESTIMONIALS CAROUSEL — Golden Vue Media ═══════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var root = document.getElementById('testimonials');
+  if (!root) return;
+
+  /* ═════════════════════════════════════════════════════════════
+     EDIT HERE — your testimonials
+     ─────────────────────────────────────────────────────────────
+     Replace the three SAMPLE entries below with real client words.
+       name    – client name
+       role    – designation, e.g. 'Founder, Company'
+       rating  – 1 to 5
+       quote   – the full testimonial (shown on the centre card)
+       short   – optional condensed version for the side cards
+                 (if left out, it is trimmed automatically)
+       photo   – optional image URL; leave '' to show the placeholder
+       sample  – true shows a "Sample testimonial" tag. Set to false
+                 (or delete it) once the entry is a genuine endorsement.
+     Add or remove entries freely (3 or more works best).
+     ═════════════════════════════════════════════════════════════ */
+  var TESTIMONIALS = [
+    {
+      sample: true,
+      name: 'Sample Client One',
+      role: 'Founder, Sample Company',
+      rating: 5,
+      quote: 'This is a sample testimonial placeholder. Replace it with a genuine client quote about working with Golden Vue Media, ideally two to three sentences covering the result, the process and the experience.',
+      short: 'Sample placeholder — replace with a short, genuine client quote.',
+      photo: ''
+    },
+    {
+      sample: true,
+      name: 'Sample Client Two',
+      role: 'Marketing Lead, Sample Organisation',
+      rating: 5,
+      quote: 'Another sample placeholder. Once you have real feedback, paste it here along with the client\u2019s name, role and an optional portrait, and this card will update automatically.',
+      short: 'Sample placeholder — a short line from a real client goes here.',
+      photo: ''
+    },
+    {
+      sample: true,
+      name: 'Sample Client Three',
+      role: 'Director, Sample Studio',
+      rating: 5,
+      quote: 'A third sample placeholder to demonstrate the layout. This text is not a real endorsement and should be swapped for an approved client testimonial before launch.',
+      short: 'Sample placeholder — swap for an approved client quote.',
+      photo: ''
+    }
+  ];
+
+  var AUTOPLAY_MS = 7000;      // time each testimonial stays on stage
+  var SWIPE_PX    = 45;        // minimum horizontal swipe distance
+  var TRAVEL_MS   = 900;       // keep in sync with --tm-dur (0.8s) + margin
+
+  /* ───────────────────────── helpers ───────────────────────── */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var STAR_PATH = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z';
+  var SILHOUETTE = '<svg viewBox="0 0 200 240" aria-hidden="true" focusable="false"><circle cx="100" cy="82" r="38"/><path d="M28 240c0-52 32-86 72-86s72 34 72 86z"/></svg>';
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function reveal(node, i) { node.classList.add('tm-r'); node.style.setProperty('--i', i); return node; }
+  function initials(name) {
+    var w = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return '·';
+    return (w[0].charAt(0) + (w.length > 1 ? w[1].charAt(0) : '')).toUpperCase();
+  }
+  function shorten(s, max) {
+    s = String(s || '').trim();
+    if (s.length <= max) return s;
+    var cut = s.slice(0, max);
+    cut = cut.slice(0, Math.max(cut.lastIndexOf(' '), 20));
+    return cut.replace(/[\s.,;:\u2014-]+$/, '') + '\u2026';
+  }
+  function stars(rating, extraClass) {
+    var r = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+    var wrap = el('div', 'tm-stars' + (extraClass ? ' ' + extraClass : ''));
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', r + ' out of 5 stars');
+    for (var k = 0; k < 5; k++) {
+      var s = document.createElementNS(SVGNS, 'svg');
+      s.setAttribute('viewBox', '0 0 24 24');
+      s.setAttribute('aria-hidden', 'true');
+      if (k >= r) s.setAttribute('class', 'is-off');
+      var p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', STAR_PATH);
+      s.appendChild(p);
+      wrap.appendChild(s);
+    }
+    return wrap;
+  }
+
+  /* ───────────────────────── build ───────────────────────── */
+  var data = TESTIMONIALS.filter(function (t) { return t && t.quote; });
+  var n = data.length;
+  var stage  = document.getElementById('tmStage');
+  var dotsEl = document.getElementById('tmDots');
+  var prevBtn = document.getElementById('tmPrev');
+  var nextBtn = document.getElementById('tmNext');
+  var statusEl = document.getElementById('tmStatus');
+  var carousel = document.getElementById('tmCarousel');
+  var wrap = root.querySelector('.tm-wrap');
+  if (!n || !stage) return;
+
+  // Re-use the logo already on the page (no extra image data duplicated)
+  var navLogo = document.querySelector('nav .logo-white');
+  var logoSrc = navLogo ? navLogo.getAttribute('src') : '';
+
+  var cards = [], dots = [], hits = [], prevOff = [];
+  var active = 0;
+
+  function avatar(t) {
+    var a = el('div', 'tm-avatar');
+    a.setAttribute('aria-hidden', 'true');
+    if (t.photo) {
+      var im = el('img'); im.src = t.photo; im.alt = ''; im.draggable = false; a.appendChild(im);
+    } else {
+      a.textContent = initials(t.name);
+    }
+    return a;
+  }
+  function mini(t, side) {
+    var m = el('div', 'tm-mini is-' + side);
+    m.setAttribute('aria-hidden', 'true');
+    m.appendChild(avatar(t));
+    m.appendChild(el('div', 'tm-name', t.name));
+    m.appendChild(stars(t.rating));
+    m.appendChild(el('p', 'tm-mini-quote', t.short || shorten(t.quote, 70)));
+    return m;
+  }
+
+  data.forEach(function (t, i) {
+    var card = el('div', 'tm-card');
+    card.setAttribute('role', 'group');
+    card.setAttribute('aria-roledescription', 'slide');
+    card.setAttribute('aria-label', (i + 1) + ' of ' + n);
+
+    // portrait
+    var portrait = el('div', 'tm-portrait');
+    var edge = el('span', 'tm-edge'); edge.setAttribute('aria-hidden', 'true');
+    var photo = el('div', 'tm-photo');
+    if (t.photo) {
+      var img = el('img', 'tm-img');
+      img.src = t.photo; img.alt = 'Portrait of ' + t.name; img.draggable = false;
+      photo.appendChild(img);
+    } else {
+      photo.classList.add('is-placeholder');
+      photo.setAttribute('aria-hidden', 'true');
+      photo.innerHTML = SILHOUETTE;            // constant markup, no user data
+    }
+    portrait.appendChild(edge); portrait.appendChild(photo);
+
+    // content
+    var body = el('div', 'tm-body');
+    var k = 0;
+    if (t.sample) body.appendChild(reveal(el('span', 'tm-badge', 'Sample testimonial'), k++));
+    var q = el('span', 'tm-qmark', '\u201C'); q.setAttribute('aria-hidden', 'true');
+    body.appendChild(reveal(q, k++));
+    var bq = el('blockquote', 'tm-quote'); bq.appendChild(el('p', null, t.quote));
+    bq.querySelector('p').style.margin = '0';
+    body.appendChild(reveal(bq, k++));
+    body.appendChild(reveal(stars(t.rating), k++));
+    var cite = el('div', 'tm-cite');
+    cite.appendChild(el('div', 'tm-name', t.name));
+    if (t.role) cite.appendChild(el('div', 'tm-role', t.role));
+    body.appendChild(reveal(cite, k++));
+    var foot = el('div', 'tm-foot');
+    foot.appendChild(el('span', 'tm-line'));
+    if (logoSrc) {
+      var logo = el('img', 'tm-brand'); logo.src = logoSrc; logo.alt = 'Golden Vue Media'; logo.draggable = false;
+      foot.appendChild(logo);
+    }
+    body.appendChild(reveal(foot, k++));
+
+    // side-card preview + click target
+    var hit = el('button', 'tm-hit');
+    hit.type = 'button';
+    hit.setAttribute('aria-label', 'Show testimonial ' + (i + 1) + ' of ' + n + ' from ' + t.name);
+    hit.addEventListener('click', function () { go(i); });
+
+    card.appendChild(portrait);
+    card.appendChild(body);
+    card.appendChild(mini(t, 'left'));
+    card.appendChild(mini(t, 'right'));
+    card.appendChild(hit);
+
+    // parked off-stage until the section scrolls into view (then they fly in)
+    card.dataset.pos = offsetOf(i) < 0 ? 'far-left' : 'far-right';
+    hit.hidden = true;
+
+    stage.appendChild(card);
+    cards.push(card); hits.push(hit);
+
+    var dot = el('button', 'tm-dot');
+    dot.type = 'button';
+    dot.setAttribute('aria-label', 'Show testimonial ' + (i + 1) + ' of ' + n);
+    dot.addEventListener('click', function () { go(i); });
+    dotsEl.appendChild(dot); dots.push(dot);
+  });
+
+  if (n < 2) {
+    [prevBtn, nextBtn, dotsEl].forEach(function (x) { if (x) x.hidden = true; });
+  }
+
+  /* ───────────────────────── positioning ───────────────────────── */
+  // offset of card i from the active one: 0 centre, -1 left, +1 right, beyond = parked
+  function offsetOf(i) {
+    var d = (((i - active) % n) + n) % n;
+    if (n === 2) return d === 0 ? 0 : 1;
+    var half = Math.floor(n / 2);
+    return d > half ? d - n : d;
+  }
+  function posName(off) {
+    if (off === 0) return 'center';
+    if (off === -1) return 'left';
+    if (off === 1) return 'right';
+    return off < 0 ? 'far-left' : 'far-right';
+  }
+
+  function render() {
+    cards.forEach(function (card, i) {
+      var off = offsetOf(i), pos = posName(off), before = prevOff[i];
+      if (before !== undefined && before !== off) {
+        var dist = Math.abs(off - before);
+        if (dist > 2) {                       // wrap-around with 4+ cards: teleport while invisible
+          card.classList.add('tm-jump');
+          card.dataset.pos = pos;
+          void card.offsetWidth;
+          requestAnimationFrame(function () { card.classList.remove('tm-jump'); });
+        } else {
+          if (dist === 2) {                   // left ↔ right: travel *behind* the others
+            card.classList.add('tm-pass');
+            clearTimeout(card._tmT);
+            card._tmT = setTimeout(function () { card.classList.remove('tm-pass'); }, TRAVEL_MS);
+          }
+          card.dataset.pos = pos;
+        }
+      } else {
+        card.dataset.pos = pos;
+      }
+      prevOff[i] = off;
+
+      var side = (pos === 'left' || pos === 'right');
+      hits[i].hidden = !side;
+      hits[i].tabIndex = side ? 0 : -1;
+      dots[i].classList.toggle('is-active', i === active);
+      if (i === active) dots[i].setAttribute('aria-current', 'true'); else dots[i].removeAttribute('aria-current');
+    });
+    statusEl.textContent = 'Testimonial ' + (active + 1) + ' of ' + n + ': ' + data[active].name;
+    syncLive();
+  }
+
+  function go(i) {
+    if (!activated) return;
+    i = ((i % n) + n) % n;
+    if (i === active) return;
+    active = i;
+    render();
+  }
+  function next() { go(active + 1); }
+  function prev() { go(active - 1); }
+
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+
+  /* ───────────────────────── autoplay (pauses on hover / focus / touch) ─────────────────────────
+     The active dot runs a CSS "progress" animation; when it ends we advance.
+     Pausing simply pauses that animation (class .is-paused), so the
+     remaining time is preserved. */
+  var hold = { hover: false, focus: false, touch: false, offscreen: true, hidden: document.hidden };
+  var reduceMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var reduced = !!(reduceMQ && reduceMQ.matches);
+  var activated = false;
+
+  root.style.setProperty('--tm-interval', AUTOPLAY_MS + 'ms');
+
+  function autoplayOn() { return activated && !reduced && n > 1; }
+  function syncLive() {
+    // Don't chatter at screen readers while it rotates by itself
+    var quiet = autoplayOn() && !root.classList.contains('is-paused');
+    statusEl.setAttribute('aria-live', quiet ? 'off' : 'polite');
+  }
+  function applyHold() {
+    var paused = hold.hover || hold.focus || hold.touch || hold.offscreen || hold.hidden;
+    root.classList.toggle('is-paused', paused);
+    root.classList.toggle('tm-autoplay', autoplayOn());
+    root.classList.toggle('tm-reduced', reduced);
+    syncLive();
+  }
+
+  dotsEl.addEventListener('animationend', function (e) {
+    if (e.animationName === 'tmProgress' && autoplayOn()) next();
+  });
+
+  wrap.addEventListener('mouseenter', function () { hold.hover = true;  applyHold(); });
+  wrap.addEventListener('mouseleave', function () { hold.hover = false; applyHold(); });
+  wrap.addEventListener('focusin', function (e) {
+    var kb = true;
+    try { kb = e.target.matches(':focus-visible'); } catch (err) {}
+    if (kb) { hold.focus = true; applyHold(); }
+  });
+  wrap.addEventListener('focusout', function () { hold.focus = false; applyHold(); });
+  document.addEventListener('visibilitychange', function () { hold.hidden = document.hidden; applyHold(); });
+
+  if (reduceMQ) {
+    var onMQ = function (e) { reduced = e.matches; applyHold(); };
+    if (reduceMQ.addEventListener) reduceMQ.addEventListener('change', onMQ);
+    else if (reduceMQ.addListener) reduceMQ.addListener(onMQ);
+  }
+
+  /* ───────────────────────── keyboard ───────────────────────── */
+  root.addEventListener('keydown', function (e) {
+    if (!wrap.contains(e.target)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); prev(); }
+    else if (k === 'Home') { e.preventDefault(); go(0); }
+    else if (k === 'End') { e.preventDefault(); go(n - 1); }
+  });
+
+  /* ───────────────────────── touch / swipe ───────────────────────── */
+  var sx = 0, sy = 0, tracking = false;
+  stage.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse') return;
+    tracking = true; sx = e.clientX; sy = e.clientY;
+    hold.touch = true; applyHold();
+  });
+  function endTouch(e, cancelled) {
+    if (!tracking) return;
+    tracking = false;
+    hold.touch = false; applyHold();
+    if (cancelled) return;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      if (dx < 0) next(); else prev();
+    }
+  }
+  stage.addEventListener('pointerup', function (e) { endTouch(e, false); });
+  stage.addEventListener('pointercancel', function (e) { endTouch(e, true); });
+
+  /* ───────────────────────── nav colour over this white section ─────────────────────────
+     Re-uses the site's nav.light-bg style. It flips only when the section's edge reaches the
+     middle of the nav bar itself (not a wide zone at the top of the screen). */
+  var navEl = document.querySelector('nav');
+  if (navEl) {
+    var navTicking = false;
+    var navLine = function () { return Math.round(navEl.offsetHeight / 2 + 18); };
+    var syncNav = function () {
+      navTicking = false;
+      var r = root.getBoundingClientRect(), y = navLine();
+      navEl.classList.toggle('light-bg', r.top <= y && r.bottom > y);
+    };
+    var queueNav = function () { if (!navTicking) { navTicking = true; requestAnimationFrame(syncNav); } };
+    window.addEventListener('scroll', queueNav, { passive: true });
+    window.addEventListener('resize', queueNav);
+    syncNav();
+  }
+
+  /* ───────────────────────── entrance on scroll ───────────────────────── */
+  function activate() {
+    if (activated) return;
+    activated = true;
+    render();
+    applyHold();
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        hold.offscreen = !en.isIntersecting;
+        if (en.isIntersecting) activate();
+        applyHold();
+      });
+    }, { threshold: 0.3 });
+    io.observe(root);
+  } else {
+    hold.offscreen = false;
+    activate();
+  }
+  applyHold();
+})();
+</script>
 </body>
 </html>
